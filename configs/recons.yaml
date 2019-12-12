@@ -1,0 +1,18 @@
+# acnn/acnn_mitdb_mitdb_1_300_200_cb_cosine.yaml
+
+TRAIN:
+  PRE_TRAIN_EPOCHS: 100
+  EPOCHS: 300
+  LR: 0.001
+  DECAY_RATE: 0.95
+  DECAY_STEP: 300
+
+SETTING:
+  NETWORK: 'CNN'
+  BEAT_NUM: 1
+  FIXED_LEN: 200
+  NORM_ALIGN: True
+
+PARAMETERS:
+  W_L2: 0.0
+  W_RECON: 0.01
