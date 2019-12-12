@@ -7,6 +7,8 @@ PyTorch implementation for a statistics-based unsupervised domain adaptation alg
 ![alt network](./figures/figs/macn.png)
 We proposed a baseline model called <u>M</u>ulti-path <u>A</u>trous <u>C</u>onvolutional <u>N</u>etwork (MACN) for NSVF heartbeat classification. The MACN can be viewed as two components, a feature extractor $\mathcal{F}$ and a classifier $\mathcal{H}$. The atrous spatial pyramid pooling (ASPP) module has four atrous convolutional layers with different dilation rates, which can extract feature representations of multiple scales. A squeeze-and-excitation layer is used to automatically select the most contributory feature channels.
 
+![](http://latex.codecogs.com/gif.latex?\frac{1}{1+sin(x)})
+
 ------------------
 ## Domain Adaptation
 
