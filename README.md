@@ -14,8 +14,10 @@ We proposed a baseline model called <u>M</u>ulti-path <u>A</u>trous <u>C</u>onvo
 
 We introduce two loss function to fulfill unsupervised domain adaptation.
 * Cluster-Aligning Loss
+
 ![](./figures/figs/align_loss.gif)
 * Cluster-Separating Loss
+
 ![](./figures/figs/sep_loss.gif)
 
 ------------------
