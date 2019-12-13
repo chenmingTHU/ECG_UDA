@@ -1,22 +1,22 @@
 # acnn/acnn_mitdb_mitdb_1_300_200_cb_cosine.yaml
 
 TRAIN:
-  PRE_TRAIN_EPOCHS: 200
+  PRE_TRAIN_EPOCHS: 100
   EPOCHS: 500
-  LR: 0.005
+  LR: 0.001
   DECAY_RATE: 0.95
   DECAY_STEP: 300
 
 SETTING:
-  NETWORK: 'MACNN_SE'
+  NETWORK: 'MACNN_ATT'
   LOSS: 'EWLoss'
-  DISTANCE: 'Cosine'
+  DISTANCE: 'L2'
   CENTER: False
   ASPP_BN: True
   ASPP_ACT: True
   RE_TRAIN: False
   NORM_ALIGN: False
-  BEAT_NUM: 1
+  BEAT_NUM: 0
   FIXED_LEN: 128
   INTER_LOSS: True
   INTRA_LOSS: True
@@ -25,4 +25,11 @@ SETTING:
 
 PARAMETERS:
   W_L2: 0.0
-  THRS: (0.99, 0.95, 0.95, 0.99)
+  BETA1: 0.1
+  BETA2: 0.1
+  BETA: 0.5
+  BETA_MMD: 0.01
+  BETA_INTER: 0.01
+  BETA_INTRA: 0.01
+  THR_M: 10.0
+  THRS: (0.99, 0.99, 0.95, 0.99)

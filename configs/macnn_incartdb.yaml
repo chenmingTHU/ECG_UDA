@@ -1,9 +1,9 @@
 # acnn/acnn_mitdb_mitdb_1_300_200_cb_cosine.yaml
 
 TRAIN:
-  PRE_TRAIN_EPOCHS: 200
+  PRE_TRAIN_EPOCHS: 100
   EPOCHS: 500
-  LR: 0.005
+  LR: 0.001
   DECAY_RATE: 0.95
   DECAY_STEP: 300
 
