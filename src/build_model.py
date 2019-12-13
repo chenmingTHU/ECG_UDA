@@ -9,7 +9,7 @@ from .losses import FocalLoss, ClassBalanceLoss, ClassBalanceFocalLoss, BinClass
     WeightedLoss, ExpWeightedLoss, L1Distance, L2Distance, CosineLoss, DynamicLoss
 from .data.dataset import *
 
-from .model.ACNN import ACNN, ACNN_deep, ACNN_SE, ACNN_SE_deep, MACNN_SE
+from .model.ACNN import ACNN, ACNN_deep, ACNN_SE, ACNN_SE_deep, MACNN_SE, MACNN_ATT
 from .model.CNN import CNN, CNN_ATT
 from .model.MultiPath_LSTM import BiLSTM
 
@@ -120,6 +120,10 @@ def build_acnn_models(model, aspp_bn, aspp_act,
         return MACNN_SE(aspp_bn=aspp_bn, aspp_act=aspp_act,
                         lead=lead, p=p, dilations=dilations,
                         act_func=act_func, f_act_func=f_act_func)
+    elif model == 'MACNN_ATT':
+        return MACNN_ATT(aspp_bn=aspp_bn, aspp_act=aspp_act,
+                         lead=lead, p=p, dilations=dilations,
+                         act_func=act_func, f_act_func=f_act_func)
     else:
         print('No available network')
         raise ValueError

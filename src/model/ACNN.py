@@ -153,6 +153,49 @@ class GAP(nn.Module):
         return self.gap(x)
 
 
+class DomainAttention(nn.Module):
+
+    def __init__(self, in_channel, bank_num=3, reduction=16):
+        super(DomainAttention, self).__init__()
+        self.channel = in_channel
+        self.bank_num = bank_num
+        self.reduction = reduction
+
+        self.gap1 = GAP()
+        self.gap2 = GAP()
+
+        self.SE_bank = nn.ModuleList()
+        for i in range(self.bank_num):
+            self.SE_bank.append(nn.Sequential(
+                nn.Linear(self.channel, self.channel // self.reduction, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Linear(self.channel // self.reduction, self.channel, bias=False))
+            )
+
+        self.fc2 = nn.Linear(self.channel, self.bank_num)
+        self.softmax = nn.Softmax(dim=1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+
+        gap1 = self.gap1(x).view(-1, self.channel)
+        banks = []
+
+        for i in range(len(self.SE_bank)):
+            resp_i = self.SE_bank[i](gap1).view(-1, self.channel, 1)
+            banks.append(resp_i)
+
+        banks = torch.cat(banks, dim=2)
+
+        gap2 = self.gap2(x).view(-1, self.channel)
+        gap2 = self.softmax(self.fc2(gap2)).view(-1, self.bank_num, 1)
+
+        net = torch.bmm(banks, gap2).view(-1, self.channel, 1, 1)
+        net = self.sigmoid(net)
+
+        return x + x * net
+
+
 class ACNN(nn.Module):
 
     def __init__(self, aspp_bn=True, aspp_act=True,
@@ -287,6 +330,82 @@ class MACNN_SE(nn.Module):
         net = self.relu(self.bn(net))
 
         net = self.gap(self.se_layer(self.aspp(net))).view(-1, self.dila_num ** 3 * 4)
+
+        logits = self.fc(net)
+
+        return net, logits
+
+    def get_feature_maps(self, x):
+
+        net = self.conv1(x)
+
+        net = self.aspp_1(net)
+        net = self.se_layer_1(net)
+
+        net = self.residual_1(net)
+
+        net = self.aspp_2(net)
+        net = self.se_layer_2(net)
+
+        net = self.residual_2(net)
+        net = self.relu(self.bn(net))
+
+        net = torch.abs(net)
+        net = torch.sum(net, dim=1).squeeze()
+
+        return net
+
+
+class MACNN_ATT(nn.Module):
+
+    def __init__(self, reduction=16, aspp_bn=True, aspp_act=True,
+                 lead=2, p=0.0, dilations=(1, 6, 12, 18), act_func='tanh', f_act_func='tanh'):
+        super(MACNN_ATT, self).__init__()
+        self.lead = lead
+        self.dila_num = len(dilations)
+
+        self.conv1 = nn.Conv2d(lead, 4, kernel_size=(3, 3), stride=1, padding=(0, 1),
+                               dilation=(1, 1), groups=1)
+
+        self.aspp_1 = ASPP(4, 4, 3, dilations=dilations, use_bn=aspp_bn,
+                           use_act=aspp_act, act_func=act_func)
+        self.se_layer_1 = SELayer(self.dila_num * 4, reduction=4)
+
+        self.residual_1 = ResidualBlock(self.dila_num * 4, self.dila_num * 4, 3, 1, p=p)
+
+        self.aspp_2 = ASPP(self.dila_num * 4, self.dila_num * 4, 3, dilations=dilations,
+                           use_bn=aspp_bn, use_act=aspp_act, act_func=act_func)
+        self.se_layer_2 = SELayer(self.dila_num ** 2 * 4, reduction=8)
+
+        self.residual_2 = ResidualBlock(self.dila_num ** 2 * 4, self.dila_num ** 2 * 4, 3, 2, p=p)
+
+        self.bn = nn.BatchNorm2d(self.dila_num ** 2 * 4)
+        self.relu = nn.ReLU()
+
+        self.aspp = ASPP(self.dila_num ** 2 * 4, self.dila_num ** 2 * 4, 3, dilations=dilations,
+                         use_bn=aspp_bn, use_act=aspp_act, act_func=f_act_func)
+
+        self.att = DomainAttention(in_channel=self.dila_num ** 3 * 4, reduction=reduction, bank_num=3)
+
+        self.gap = GAP()
+
+        self.fc = nn.Linear(self.dila_num ** 3 * 4, 4)
+
+    def forward(self, x):
+        net = self.conv1(x)
+
+        net = self.aspp_1(net)
+        net = self.se_layer_1(net)
+
+        net = self.residual_1(net)
+
+        net = self.aspp_2(net)
+        net = self.se_layer_2(net)
+
+        net = self.residual_2(net)
+        net = self.relu(self.bn(net))
+
+        net = self.gap(self.att(self.aspp(net))).view(-1, self.dila_num ** 3 * 4)
 
         logits = self.fc(net)
 
