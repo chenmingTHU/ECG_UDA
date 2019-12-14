@@ -503,6 +503,7 @@ def train(args):
             pesudo_labels, legal_indices = obtain_pesudo_labels(teacher_net, loaded_models, t_batch, thrs)
 
             tmp_centers_t = {}
+            tmp_feats_t = {}
             if len(pesudo_labels):
                 feat_t_pesudo = torch.index_select(feat_t, dim=0, index=torch.LongTensor(legal_indices).cuda())
 
@@ -512,6 +513,7 @@ def train(args):
                         pesudo_label_nums[l] = len(_index)
                         _index = np.squeeze(_index, axis=1)
                         _feat_t = torch.index_select(feat_t_pesudo, dim=0, index=torch.LongTensor(_index).cuda())
+                        tmp_feats_t[l] = _feat_t
                         bs_ = _feat_t.size()[0]
 
                         local_centers_tl = torch.mean(_feat_t, dim=0)
@@ -534,13 +536,16 @@ def train(args):
             true_label_nums = {0: 0, 1: 0, 2: 0, 3: 0}
 
             tmp_centers_s = {}
+            tmp_feats_s = {}
             for l in range(4):
                 _index = np.argwhere(sl_batch_np == l)
                 if len(_index):
                     true_label_nums[l] = len(_index)
                     _index = np.squeeze(_index, axis=1)
                     _feat_s = torch.index_select(feat_s, dim=0, index=torch.LongTensor(_index).cuda())
+                    tmp_feats_s[l] = _feat_s
                     bs_ = _feat_s.size()[0]
+
                     local_centers_sl = torch.mean(_feat_s, dim=0)
                     tmp_centers_s[l] = local_centers_sl
                     delta_cs = centers_s[l] - local_centers_sl
@@ -578,6 +583,13 @@ def train(args):
             if flag_intra:
                 loss += loss_intra * w_intra
 
+            loss_coral = 0
+            if cfg.SETTING.CORAL:
+                for l in tmp_feats_s.keys():
+                    if l in tmp_feats_t.keys():
+                        loss_coral += coral(tmp_feats_s[l], tmp_feats_t[l])
+                loss += loss_coral
+
             loss_c = 0
 
             for l in range(4):
@@ -613,8 +625,9 @@ def train(args):
                 print("[{}, {}] cls loss: {:.4f}, cs loss: {:.4f}, "
                       "ct loss: {:.4f}, cst loss: {:.4f}, mmd loss: {:.4f}, "
                       "inter loss: {:.4f}, intra loss: {:.4f}, c loss: {:.4f}, "
+                      "CORAL: {:.4f}, "
                       "lr: {:.5f}".format(epoch, idb, loss_cls, loss_cs, loss_ct, loss_cst, loss_mmd,
-                                          loss_inter, loss_intra, loss_c, running_lr))
+                                          loss_inter, loss_intra, loss_c, loss_coral, running_lr))
 
                 print("The number of pesudo labels and true labels:")
                 pprint.pprint(pesudo_label_nums)

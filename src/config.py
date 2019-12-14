@@ -78,6 +78,9 @@ _C.SETTING.INCRE_THRS = False
 _C.SETTING.ACT = 'tanh'
 _C.SETTING.F_ACT = 'tanh'
 
+# The marker of using CORAL for domain adaptation
+_C.SETTING.CORAL = False
+
 
 _C.PARAMETERS = CN()
 

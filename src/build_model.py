@@ -9,7 +9,7 @@ from .losses import FocalLoss, ClassBalanceLoss, ClassBalanceFocalLoss, BinClass
     WeightedLoss, ExpWeightedLoss, L1Distance, L2Distance, CosineLoss, DynamicLoss
 from .data.dataset import *
 
-from .model.ACNN import ACNN, ACNN_deep, ACNN_SE, ACNN_SE_deep, MACNN_SE, MACNN_ATT, MACNN_MATT
+from .model.ACNN import ACNN, ACNN_SE, MACNN_SE, MACNN_ATT, MACNN_MATT
 from .model.CNN import CNN, CNN_ATT
 from .model.MultiPath_LSTM import BiLSTM
 
@@ -110,12 +110,6 @@ def build_acnn_models(model, aspp_bn, aspp_act,
     elif model == 'ACNN_SE':
         return ACNN_SE(aspp_bn=aspp_bn, aspp_act=aspp_act,
                        lead=lead, p=p, dilations=dilations)
-    elif model == 'ACNN_deep':
-        return ACNN_deep(aspp_bn=aspp_bn, aspp_act=aspp_act,
-                         lead=lead, p=p, dilations=dilations)
-    elif model == 'ACNN_SE_deep':
-        return ACNN_SE_deep(aspp_bn=aspp_bn, aspp_act=aspp_act,
-                            lead=lead, p=p, dilations=dilations)
     elif model == 'MACNN_SE':
         return MACNN_SE(aspp_bn=aspp_bn, aspp_act=aspp_act,
                         lead=lead, p=p, dilations=dilations,
