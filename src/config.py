@@ -24,6 +24,8 @@ _C.TRAIN.LR = 0.001
 _C.TRAIN.DECAY_RATE = 0.99
 # The decay step for learning rate decay
 _C.TRAIN.DECAY_STEP = 200
+# The marker of using ImbalanceSampler
+_C.TRAIN.IMBALANCE_SAMPLE = True
 
 
 _C.SETTING = CN()
@@ -92,6 +94,8 @@ _C.PARAMETERS.W_CLS = 10.0
 _C.PARAMETERS.W_BIN = 0.1
 # The weight of consistency constraint (if any)
 _C.PARAMETERS.W_CON = 1e-2
+# The weight of CORAL
+_C.PARAMETERS.W_CORAL = 1.0
 
 # The weight of center loss for source data
 _C.PARAMETERS.BETA1 = 1.0

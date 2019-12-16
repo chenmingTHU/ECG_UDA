@@ -6,6 +6,7 @@ TRAIN:
   LR: 0.001
   DECAY_RATE: 0.95
   DECAY_STEP: 300
+  IMBALANCE_SAMPLE: False
 
 SETTING:
   NETWORK: 'MACNN_SE'
@@ -15,13 +16,13 @@ SETTING:
   ASPP_BN: True
   ASPP_ACT: True
   RE_TRAIN: False
-  NORM_ALIGN: True
+  NORM_ALIGN: False
   BEAT_NUM: 0
   FIXED_LEN: 128
   INTER_LOSS: True
   INTRA_LOSS: True
   DILATIONS: (1, 6, 12, 18)
-  ACT: 'prelu'
+  ACT: 'relu'
 
 PARAMETERS:
   W_L2: 0.0

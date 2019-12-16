@@ -11,7 +11,7 @@ SETTING:
   NETWORK: 'MACNN_SE'
   LOSS: 'EWLoss'
   DISTANCE: 'Cosine'
-  TRAIN_DATASET: 'fmitdb'
+  TRAIN_DATASET: 'mitdb'
   TEST_DATASET: 'svdb'
   CENTER: False
   ASPP_BN: True

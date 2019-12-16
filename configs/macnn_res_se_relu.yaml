@@ -8,7 +8,7 @@ TRAIN:
   DECAY_STEP: 300
 
 SETTING:
-  NETWORK: 'MACNN_SE'
+  NETWORK: 'MACNN_ResSE'
   LOSS: 'EWLoss'
   DISTANCE: 'Cosine'
   CENTER: False
@@ -21,7 +21,7 @@ SETTING:
   INTER_LOSS: True
   INTRA_LOSS: True
   DILATIONS: (1, 6, 12, 18)
-  ACT: 'prelu'
+  ACT: 'relu'
 
 PARAMETERS:
   W_L2: 0.0

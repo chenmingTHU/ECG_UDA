@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .se_layer import SELayer
+from .se_layer import SELayer, ResSELayer
 from .lsoftmax import LSoftmaxLinear
 from ..utils import init_weights
 
@@ -356,6 +356,81 @@ class MACNN_SE(nn.Module):
         return net
 
 
+class MACNN_ResSE(nn.Module):
+
+    def __init__(self, reduction=16, aspp_bn=True, aspp_act=True,
+                 lead=2, p=0.0, dilations=(1, 6, 12, 18), act_func='tanh', f_act_func='tanh'):
+        super(MACNN_ResSE, self).__init__()
+        self.lead = lead
+        self.dila_num = len(dilations)
+
+        self.conv1 = nn.Conv2d(lead, 4, kernel_size=(3, 3), stride=1, padding=(0, 1),
+                               dilation=(1, 1), groups=1)
+
+        self.aspp_1 = ASPP(4, 4, 3, dilations=dilations, use_bn=aspp_bn,
+                           use_act=aspp_act, act_func=act_func)
+        self.se_layer_1 = ResSELayer(self.dila_num * 4, reduction=4)
+
+        self.residual_1 = ResidualBlock(self.dila_num * 4, self.dila_num * 4, 3, 1, p=p)
+
+        self.aspp_2 = ASPP(self.dila_num * 4, self.dila_num * 4, 3, dilations=dilations,
+                           use_bn=aspp_bn, use_act=aspp_act, act_func=act_func)
+        self.se_layer_2 = ResSELayer(self.dila_num ** 2 * 4, reduction=8)
+
+        self.residual_2 = ResidualBlock(self.dila_num ** 2 * 4, self.dila_num ** 2 * 4, 3, 2, p=p)
+
+        self.bn = nn.BatchNorm2d(self.dila_num ** 2 * 4)
+        self.relu = nn.ReLU()
+
+        self.aspp = ASPP(self.dila_num ** 2 * 4, self.dila_num ** 2 * 4, 3, dilations=dilations,
+                         use_bn=aspp_bn, use_act=aspp_act, act_func=f_act_func)
+        self.se_layer = ResSELayer(self.dila_num ** 3 * 4, reduction=reduction)
+
+        self.gap = GAP()
+
+        self.fc = nn.Linear(self.dila_num ** 3 * 4, 4)
+
+    def forward(self, x):
+        net = self.conv1(x)
+
+        net = self.aspp_1(net)
+        net = self.se_layer_1(net)
+
+        net = self.residual_1(net)
+
+        net = self.aspp_2(net)
+        net = self.se_layer_2(net)
+
+        net = self.residual_2(net)
+        net = self.relu(self.bn(net))
+
+        net = self.gap(self.se_layer(self.aspp(net))).view(-1, self.dila_num ** 3 * 4)
+
+        logits = self.fc(net)
+
+        return net, logits
+
+    def get_feature_maps(self, x):
+
+        net = self.conv1(x)
+
+        net = self.aspp_1(net)
+        net = self.se_layer_1(net)
+
+        net = self.residual_1(net)
+
+        net = self.aspp_2(net)
+        net = self.se_layer_2(net)
+
+        net = self.residual_2(net)
+        net = self.relu(self.bn(net))
+
+        net = torch.abs(net)
+        net = torch.sum(net, dim=1).squeeze()
+
+        return net
+
+
 class MACNN_ATT(nn.Module):
 
     def __init__(self, reduction=16, aspp_bn=True, aspp_act=True,
@@ -428,6 +503,28 @@ class MACNN_ATT(nn.Module):
 
         net = torch.abs(net)
         net = torch.sum(net, dim=1).squeeze()
+
+        return net
+
+    def get_att_maps(self, x):
+
+        net = self.conv1(x)
+
+        net = self.aspp_1(net)
+        net = self.se_layer_1(net)
+
+        net = self.residual_1(net)
+
+        net = self.aspp_2(net)
+        net = self.se_layer_2(net)
+
+        net = self.residual_2(net)
+        net = self.relu(self.bn(net))
+
+        net = self.aspp(net)
+
+        net = self.att.gap2(net)
+        net = F.softmax(self.att.fc2(net), dim=1)
 
         return net
 

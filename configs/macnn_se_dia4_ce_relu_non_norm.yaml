@@ -4,12 +4,12 @@ TRAIN:
   PRE_TRAIN_EPOCHS: 100
   EPOCHS: 500
   LR: 0.001
-  DECAY_RATE: 0.95
+  DECAY_RATE: 0.99
   DECAY_STEP: 300
 
 SETTING:
   NETWORK: 'MACNN_SE'
-  LOSS: 'EWLoss'
+  LOSS: 'CELoss'
   DISTANCE: 'Cosine'
   CENTER: False
   ASPP_BN: True
@@ -22,7 +22,6 @@ SETTING:
   INTRA_LOSS: True
   DILATIONS: (1, 6, 12, 18)
   ACT: 'relu'
-  F_ACT: 'prelu'
 
 PARAMETERS:
   W_L2: 0.0

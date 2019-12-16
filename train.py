@@ -196,9 +196,14 @@ def train(args):
                           transform=transform, beat_num=cfg.SETTING.BEAT_NUM,
                           fixed_len=cfg.SETTING.FIXED_LEN, lead=cfg.SETTING.LEAD)
 
-    dataloader = DataLoader(dataset, batch_size=batch_size,
-                            num_workers=cfg.SYSTEM.NUM_WORKERS,
-                            sampler=UDAImbalancedDatasetSampler(dataset))
+    if cfg.TRAIN.IMBALANCE_SAMPLE:
+        dataloader = DataLoader(dataset, batch_size=batch_size,
+                                num_workers=cfg.SYSTEM.NUM_WORKERS,
+                                sampler=UDAImbalancedDatasetSampler(dataset))
+    else:
+        dataloader = DataLoader(dataset, batch_size=batch_size,
+                                num_workers=cfg.SYSTEM.NUM_WORKERS,
+                                shuffle=True)
 
     iter_num = int(len(dataset) / batch_size)
 
@@ -241,7 +246,7 @@ def train(args):
                                                gamma=decay_rate)
     evaluator = Eval(num_class=4)
 
-    if check_epoch <= pre_train_epochs - 1:
+    if check_epoch < pre_train_epochs - 1:
         print("Starting STAGE I: pre-training the model using source data")
 
         for epoch in range(max(0, check_epoch), pre_train_epochs):
@@ -288,7 +293,7 @@ def train(args):
 
                 torch.cuda.empty_cache()
 
-    if cfg.SETTING.RE_TRAIN and (check_epoch <= pre_train_epochs * 2 - 1):
+    if cfg.SETTING.RE_TRAIN and (check_epoch < pre_train_epochs * 2 - 1):
 
         net.eval()
         centers_s, counter_s = init_source_centers(net, source, source_records, data_dict_source,
@@ -573,9 +578,20 @@ def train(args):
                 for j in range(i + 1, 4):
                     loss_inter_ij_s = torch.max(thr_m - criterion_dist(centers_s[i], centers_s[j]),
                                                 torch.FloatTensor([0]).cuda()).squeeze()
-                    loss_inter_ij_t = torch.max(thr_m - criterion_dist(centers_t[i], centers_t[j]),
-                                                torch.FloatTensor([0]).cuda()).squeeze()
-                    loss_inter_ij = (loss_inter_ij_s + loss_inter_ij_t)
+                    # loss_inter_ij_t = torch.max(thr_m - criterion_dist(centers_t[i], centers_t[j]),
+                    #                             torch.FloatTensor([0]).cuda()).squeeze()
+
+                    '''Add items between two domains'''
+                    # loss_inter_ij_st = torch.max(thr_m - criterion_dist(centers_s[i], centers_t[j]),
+                    #                              torch.FloatTensor([0]).cuda()).squeeze()
+                    # loss_inter_ij_ts = torch.max(thr_m - criterion_dist(centers_t[i], centers_s[j]),
+                    #                              torch.FloatTensor([0]).cuda()).squeeze()
+                    # loss_inter_ij = (loss_inter_ij_s + loss_inter_ij_t + loss_inter_ij_st + loss_inter_ij_ts) / 4
+
+                    # loss_inter_ij = (loss_inter_ij_s + loss_inter_ij_t)
+
+                    loss_inter_ij = loss_inter_ij_s
+
                     loss_inter += loss_inter_ij
 
             if flag_inter:

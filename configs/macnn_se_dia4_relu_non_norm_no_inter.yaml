@@ -18,11 +18,10 @@ SETTING:
   NORM_ALIGN: False
   BEAT_NUM: 0
   FIXED_LEN: 128
-  INTER_LOSS: True
+  INTER_LOSS: False
   INTRA_LOSS: True
   DILATIONS: (1, 6, 12, 18)
-  ACT: 'leaky_relu'
-  F_ACT: 'leaky_relu'
+  ACT: 'relu'
 
 PARAMETERS:
   W_L2: 0.0
