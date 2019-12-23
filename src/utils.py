@@ -112,6 +112,14 @@ class Eval(object):
 
         return f1_score(y_true=y_true, y_pred=y_pred, average=None)
 
+    def _get_recall(self, y_pred, y_label):
+        recalls = recall_score(y_pred=y_pred, y_true=y_label, average=None)
+        return recalls
+
+    def _get_precisions(self, y_pred, y_label):
+        precisions = precision_score(y_pred=y_pred, y_true=y_label, average=None)
+        return precisions
+
     def _sklean_metrics(self, y_pred, y_label):
 
         precisions = precision_score(y_pred=y_pred, y_true=y_label, average=None)
@@ -179,6 +187,40 @@ class CorrelationAnalysis(object):
 #         nn.init.xavier_normal_(m.weight)
 #         nn.init.zeros_(m.bias)
 
+class EMA(object):
+    def __init__(self, model, decay):
+        self.model = model
+        self.decay = decay
+        self.shadow = {}
+        self.backup = {}
+
+    def register(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                self.shadow[name] = param.data.clone()
+
+    def update(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                assert name in self.shadow
+                new_average = (1.0 - self.decay) * param.data + self.decay * self.shadow[name]
+                self.shadow[name] = new_average.clone()
+
+    def apply_shadow(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                assert name in self.shadow
+                self.backup[name] = param.data
+                param.data = self.shadow[name]
+
+    def restore(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                assert name in self.backup
+                param.data = self.backup[name]
+        self.backup = {}
+
+
 def init_weights(m):
 
     if isinstance(m, nn.Conv1d) or isinstance(m, nn.Conv2d):
@@ -191,3 +233,55 @@ def init_weights(m):
         nn.init.xavier_normal_(m.weight)
         if m.bias is not None:
             nn.init.zeros_(m.bias)
+
+
+def xavier_init(module, gain=1, bias=0, distribution='normal'):
+    assert distribution in ['uniform', 'normal']
+    if distribution == 'uniform':
+        nn.init.xavier_uniform_(module.weight, gain=gain)
+    else:
+        nn.init.xavier_normal_(module.weight, gain=gain)
+    if hasattr(module, 'bias'):
+        nn.init.constant_(module.bias, bias)
+
+
+def normal_init(module, mean=0, std=1, bias=0):
+    nn.init.normal_(module.weight, mean, std)
+    if hasattr(module, 'bias'):
+        nn.init.constant_(module.bias, bias)
+
+
+def uniform_init(module, a=0, b=1, bias=0):
+    nn.init.uniform_(module.weight, a, b)
+    if hasattr(module, 'bias'):
+        nn.init.constant_(module.bias, bias)
+
+
+def kaiming_init(module,
+                 mode='fan_out',
+                 nonlinearity='relu',
+                 bias=0,
+                 distribution='normal'):
+    assert distribution in ['uniform', 'normal']
+    if distribution == 'uniform':
+        nn.init.kaiming_uniform_(
+            module.weight, mode=mode, nonlinearity=nonlinearity)
+    else:
+        nn.init.kaiming_normal_(
+            module.weight, mode=mode, nonlinearity=nonlinearity)
+    if hasattr(module, 'bias'):
+        nn.init.constant_(module.bias, bias)
+
+
+def constant_init(module, val, bias=0):
+
+    nn.init.constant_(module.weight, val)
+
+    if hasattr(module, 'bias'):
+        nn.init.constant_(module.bias, bias)
+
+
+def bias_init_with_prob(prior_prob):
+    """ initialize conv/fc bias value according to giving probablity"""
+    bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+    return bias_init

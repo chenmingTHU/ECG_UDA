@@ -19,18 +19,29 @@ from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 plt.switch_backend('Agg')
 
+# FLAG_RESAMPLE = True
+FLAG_RESAMPLE = False
+if FLAG_RESAMPLE:
+    DATA_PATH = '/home/workspace/mingchen/ECG_UDA/data'
+    INDEX_ROOT_PATH = '/home/workspace/mingchen/ECG_UDA/data_index'
+else:
+    DATA_PATH = '/home/workspace/mingchen/ECG_UDA/raw_data'
+    INDEX_ROOT_PATH = '/home/workspace/mingchen/ECG_UDA/raw_data_index'
 
 DENOISE_DATA_DIRS = {
-    'mitdb': "/home/workspace/mingchen/ECG_UDA/data/mitdb/",
-    'incartdb': "/home/workspace/mingchen/ECG_UDA/data/incartdb",
-    'svdb': "/home/workspace/mingchen/ECG_UDA/data/svdb"
+    'mitdb': DATA_PATH + "/mitdb/",
+    'incartdb': DATA_PATH + "/incartdb",
+    'svdb': DATA_PATH + "/svdb",
+    'ltdb': DATA_PATH + "/ltdb"
 }
 
 SAMPLE_RATES = {
     'mitdb': 360,
     'incartdb': 257,
     'svdb': 128,
+    'ltdb': 128
 }
+UNI_FS = 360
 
 '''MITDB dataset division'''
 
@@ -107,7 +118,6 @@ def load_beat_with_rr(path, data_dir, n, fs, lead=1):
     else:
         beat = data_dir[record_id + '.mat']['signal'][[0, 1], low_bound + left_points: high_bound + right_points + 1]
 
-    # beat = beat - np.mean(beat, axis=1, keepdims=True)
     max_v = np.max(beat, axis=1, keepdims=True)
     min_v = np.min(beat, axis=1, keepdims=True)
     beat = beat / (max_v - min_v)
@@ -152,7 +162,6 @@ def augmentation_transform_with_rr(path, data_dir, n, fs, lead=1):
         beat = data_dir[record_id + '.mat']['signal'][[0, 1], low_bound + left_points: high_bound + right_points + 1]
     beat = beat + 0.1 * np.max(beat) * np.random.randn(beat.shape[0], beat.shape[1])
 
-    # beat = beat - np.mean(beat, axis=1, keepdims=True)
     max_v = np.max(beat, axis=1, keepdims=True)
     min_v = np.min(beat, axis=1, keepdims=True)
     beat = beat / (max_v - min_v)
@@ -189,7 +198,7 @@ class MULTI_ECG_TRAIN_DATASET(Dataset):
         target_transform: Transformation function for labels
         '''
 
-        root_index = '/home/workspace/mingchen/ECG_UDA/data_index'
+        root_index = INDEX_ROOT_PATH
         categories = ['N', 'V', 'S', 'F']
 
         self.n = beat_num
@@ -206,7 +215,8 @@ class MULTI_ECG_TRAIN_DATASET(Dataset):
 
         self.load_path = osp.join(osp.join(root_index, dataset_name), 'entire')
         self.data_path = DENOISE_DATA_DIRS[dataset_name]
-        self.fs = SAMPLE_RATES[dataset_name]
+
+        self.fs = UNI_FS if FLAG_RESAMPLE else SAMPLE_RATES[dataset_name]
 
         self.samples = []
 
@@ -246,7 +256,7 @@ class MULTI_ECG_EVAL_DATASET(Dataset):
                  beat_num=1, fixed_len=200, lead=1, unlabel_num=300):
         super(MULTI_ECG_EVAL_DATASET, self).__init__()
 
-        root_index = '/home/workspace/mingchen/ECG_UDA/data_index'
+        root_index = INDEX_ROOT_PATH
         categories = ['N', 'V', 'S', 'F']
 
         self.n = beat_num
@@ -267,9 +277,10 @@ class MULTI_ECG_EVAL_DATASET(Dataset):
             files = os.listdir(osp.join(self.load_path, cate))
             samples = [(file, cate) for file in files if file.split('_')[0] in self.test_records
                        and (int(file.split('.')[0].split('_')[1]) >= unlabel_num)]
+            # samples = [(file, cate) for file in files if file.split('_')[0] in self.test_records]
             self.samples.extend(samples)
 
-        self.fs = SAMPLE_RATES[dataset_name]
+        self.fs = UNI_FS if FLAG_RESAMPLE else SAMPLE_RATES[dataset_name]
         self.fixed_len = fixed_len
 
     def __len__(self):
@@ -305,7 +316,7 @@ class UDA_DATASET(Dataset):
                  fixed_len=200, lead=1):
         super(UDA_DATASET, self).__init__()
 
-        root_index = '/home/workspace/mingchen/ECG_UDA/data_index'
+        root_index = INDEX_ROOT_PATH
         categories = ['N', 'V', 'S', 'F']
 
         self.n = beat_num
@@ -331,8 +342,8 @@ class UDA_DATASET(Dataset):
         self.transform = transform
         self.target_transform = transform
 
-        self.fs_s = SAMPLE_RATES[source]
-        self.fs_t = SAMPLE_RATES[target]
+        self.fs_s = UNI_FS if FLAG_RESAMPLE else SAMPLE_RATES[source]
+        self.fs_t = UNI_FS if FLAG_RESAMPLE else SAMPLE_RATES[target]
 
         self.fixed_len = fixed_len
 

@@ -196,8 +196,8 @@ def init_target_centers(net, target, records, data_dict, batch_size, beat_num, f
             features[l] = features[l].cuda()
             print(features[l].size())
         else:
+            del features[l]
             print('No avaliable centers')
-            raise ValueError
 
     return features, counters
 

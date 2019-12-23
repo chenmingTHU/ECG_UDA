@@ -7,14 +7,14 @@ import os.path as osp
 
 from .losses import FocalLoss, ClassBalanceLoss, ClassBalanceFocalLoss, BinClassBalanceLoss, BatchWeightedLoss, \
     WeightedLoss, ExpWeightedLoss, L1Distance, L2Distance, CosineLoss, DynamicLoss
-from .data.dataset import *
+from .data.dataset_3d import *
 
-from .model.ACNN import ACNN, ACNN_SE, MACNN_SE, MACNN_ResSE, MACNN_ATT, MACNN_MATT
+from .model.ACNN import MACNN_SE, MACNN_ResSE, MACNN_ATT, MACNN_MATT, MACNN_ResATT, MACNN_Context
 from .model.CNN import CNN, CNN_ATT
 from .model.MultiPath_LSTM import BiLSTM
 
 
-def loss_function(loss, dataset='mitdb', num_ew=75000):
+def loss_function(loss, dataset='mitdb', num_ew=75000, T=1):
 
     if dataset == 'fmitdb':
         dataset = 'mitdb'
@@ -53,7 +53,7 @@ def loss_function(loss, dataset='mitdb', num_ew=75000):
         'WLoss': WeightedLoss(n=categories['N'], v=categories['V'],
                               s=categories['S'], f=categories['F']),
         'EWLoss': ExpWeightedLoss(n=categories['N'], v=categories['V'],
-                                  s=categories['S'], f=categories['F'], beta=num_ew),
+                                  s=categories['S'], f=categories['F'], beta=num_ew, T=T),
         'DLoss': DynamicLoss(n=categories['N'], v=categories['V'],
                              s=categories['S'], f=categories['F'], beta=75000)
     }
@@ -102,18 +102,20 @@ def build_validation_records(target):
 
 
 def build_acnn_models(model, aspp_bn, aspp_act,
-                      lead, p, dilations, act_func, f_act_func):
+                      lead, p, dilations,
+                      act_func, f_act_func,
+                      apply_residual):
 
-    if model == 'ACNN':
-        return ACNN(aspp_bn=aspp_bn, aspp_act=aspp_act,
-                    lead=lead, p=p, dilations=dilations)
-    elif model == 'ACNN_SE':
-        return ACNN_SE(aspp_bn=aspp_bn, aspp_act=aspp_act,
-                       lead=lead, p=p, dilations=dilations)
-    elif model == 'MACNN_SE':
+    if model == 'MACNN_SE':
         return MACNN_SE(aspp_bn=aspp_bn, aspp_act=aspp_act,
                         lead=lead, p=p, dilations=dilations,
-                        act_func=act_func, f_act_func=f_act_func)
+                        act_func=act_func, f_act_func=f_act_func,
+                        apply_residual=apply_residual)
+    elif model == 'MACNN_Context':
+        return MACNN_Context(aspp_bn=aspp_bn, aspp_act=aspp_act,
+                             lead=lead, p=p, dilations=dilations,
+                             act_func=act_func, f_act_func=f_act_func,
+                             apply_residual=apply_residual)
     elif model == 'MACNN_ResSE':
         return MACNN_ResSE(aspp_bn=aspp_bn, aspp_act=aspp_act,
                            lead=lead, p=p, dilations=dilations,
@@ -121,7 +123,12 @@ def build_acnn_models(model, aspp_bn, aspp_act,
     elif model == 'MACNN_ATT':
         return MACNN_ATT(aspp_bn=aspp_bn, aspp_act=aspp_act,
                          lead=lead, p=p, dilations=dilations,
-                         act_func=act_func, f_act_func=f_act_func)
+                         act_func=act_func, f_act_func=f_act_func,
+                         apply_residual=apply_residual)
+    elif model == 'MACNN_ResATT':
+        return MACNN_ResATT(aspp_bn=aspp_bn, aspp_act=aspp_act,
+                            lead=lead, p=p, dilations=dilations,
+                            act_func=act_func, f_act_func=f_act_func)
     elif model == 'MACNN_MATT':
         return MACNN_MATT(aspp_bn=aspp_bn, aspp_act=aspp_act,
                           lead=lead, p=p, dilations=dilations,

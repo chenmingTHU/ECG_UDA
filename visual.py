@@ -94,7 +94,8 @@ def vis(args):
     net = build_acnn_models(cfg.SETTING.NETWORK, cfg.SETTING.ASPP_BN,
                             cfg.SETTING.ASPP_ACT, cfg.SETTING.LEAD,
                             cfg.PARAMETERS.P, cfg.SETTING.DILATIONS,
-                            act_func=cfg.SETTING.ACT, f_act_func=cfg.SETTING.F_ACT)
+                            act_func=cfg.SETTING.ACT, f_act_func=cfg.SETTING.F_ACT,
+                            apply_residual=cfg.SETTING.RESIDUAL)
     net.load_state_dict(torch.load(check_point_dir)['model_state_dict'])
     net.cuda()
     net.eval()
@@ -146,13 +147,12 @@ def vis(args):
 
             features_s, logits_s = net(s_batch)
 
-            feats = net.get_feature_maps(s_batch)
-            feats = feats.detach().cpu().numpy()
-
-            plt.figure(figsize=(12.5, 10))
-            plt.plot(feats[0])
-            plt.savefig(osp.join(img_path, '{}.png'.format(idb)), bbox_inches='tight')
-            plt.close()
+            # feats = net.get_feature_maps(s_batch)
+            # feats = feats.detach().cpu().numpy()
+            # plt.figure(figsize=(12.5, 10))
+            # plt.plot(feats[0])
+            # plt.savefig(osp.join(img_path, '{}.png'.format(idb)), bbox_inches='tight')
+            # plt.close()
 
             feat_s_cpu = features_s.detach().cpu().numpy()
             logits_s_cpu = logits_s.detach().cpu().numpy()

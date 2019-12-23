@@ -28,6 +28,8 @@ parser.add_argument('--config', default=None, type=str,
                     help='The directory of config .yaml file')
 parser.add_argument('--check_epoch', default=-1, type=int,
                     help='The checkpoint ID for recovering training procedure')
+parser.add_argument('--use_ema', dest='use_ema',
+                    action='store_true')
 args = parser.parse_args()
 
 ROOT_PATH = '/home/workspace/mingchen/ECG_UDA/data_index'
@@ -37,6 +39,8 @@ def get_optimizer(optimizer, params, lr, weight_decay):
 
     if optimizer == 'Adam':
         return optim.Adam(params, lr=lr, weight_decay=weight_decay)
+    elif optimizer == 'Adagrad':
+        return optim.Adagrad(params, lr=lr, weight_decay=weight_decay)
     elif optimizer == 'SGD':
         return optim.SGD(params, lr=lr, momentum=0.9, weight_decay=weight_decay)
     else:
@@ -60,11 +64,18 @@ def get_cb_weights(source, beta_cb):
 
 def update_thrs(thrs, running_epoch, epochs):
 
-    for l in range(4):
-        if l == 0:
-            thrs[l] = thrs[l] + 0.05 * (running_epoch / epochs)
-        if l == 1 or l == 2:
-            thrs[l] = thrs[l] + 0.1 * (running_epoch / epochs)
+    interval = 10
+
+    if running_epoch % interval == 0:
+        for l in range(4):
+            if l == 0:
+                thrs[l] = thrs[l] + 0.001
+            if l == 1:
+                thrs[l] = thrs[l] + 0.001
+            if l == 2:
+                thrs[l] = thrs[l] + 0.001
+            if l == 3:
+                thrs[l] = thrs[l] + 0.001
     return thrs
 
 
@@ -120,12 +131,18 @@ def obtain_pesudo_labels(net, loaded_models, t_batch, thrs, use_thr=True):
 def train(args):
 
     cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     cfg_dir = args.config
     cfg = get_cfg_defaults()
     cfg.merge_from_file(cfg_dir)
     cfg.freeze()
     print(cfg)
+
+    '''Setting the random seed used in the experiment'''
+    torch.manual_seed(cfg.SETTING.SEED)
+    torch.cuda.manual_seed(cfg.SETTING.SEED)
 
     source = cfg.SETTING.TRAIN_DATASET
     target = cfg.SETTING.TEST_DATASET
@@ -136,7 +153,6 @@ def train(args):
     lr = cfg.TRAIN.LR
     decay_rate = cfg.TRAIN.DECAY_RATE
     decay_step = cfg.TRAIN.DECAY_STEP
-    flag_c = cfg.SETTING.CENTER
     flag_intra = cfg.SETTING.INTRA_LOSS
     flag_inter = cfg.SETTING.INTER_LOSS
     flag_norm = cfg.SETTING.NORM_ALIGN
@@ -145,7 +161,6 @@ def train(args):
     w_l2 = cfg.PARAMETERS.W_L2
     w_cls = cfg.PARAMETERS.W_CLS
     w_norm = cfg.PARAMETERS.W_NORM
-    w_c = cfg.PARAMETERS.BETA_C
     w_cs = cfg.PARAMETERS.BETA1
     w_ct = cfg.PARAMETERS.BETA2
     w_cst = cfg.PARAMETERS.BETA
@@ -161,7 +176,6 @@ def train(args):
     lr_c = cfg.PARAMETERS.LR_C
     lr_cs = cfg.PARAMETERS.LR_C_S
     lr_ct = cfg.PARAMETERS.LR_C_T
-    beta_cb = cfg.PARAMETERS.BETA_CB
 
     thrs = {}
     for l in range(len(thrs_)):
@@ -169,9 +183,9 @@ def train(args):
 
     exp_id = os.path.basename(cfg_dir).split('.')[0]
 
-    log_path = osp.join('./log', exp_id)
-    if not osp.exists(log_path):
-        os.makedirs(log_path)
+    # log_path = osp.join('./log', exp_id)
+    # if not osp.exists(log_path):
+    #     os.makedirs(log_path)
 
     save_path = os.path.join(cfg.SYSTEM.SAVE_PATH, exp_id)
     if not osp.exists(save_path):
@@ -210,14 +224,16 @@ def train(args):
     net = build_acnn_models(cfg.SETTING.NETWORK, cfg.SETTING.ASPP_BN,
                             cfg.SETTING.ASPP_ACT, cfg.SETTING.LEAD,
                             cfg.PARAMETERS.P, cfg.SETTING.DILATIONS,
-                            act_func=cfg.SETTING.ACT, f_act_func=cfg.SETTING.F_ACT)
+                            act_func=cfg.SETTING.ACT, f_act_func=cfg.SETTING.F_ACT,
+                            apply_residual=cfg.SETTING.RESIDUAL)
     # Initialization of the model
     net.apply(init_weights)
 
     teacher_net = build_acnn_models(cfg.SETTING.NETWORK, cfg.SETTING.ASPP_BN,
                                     cfg.SETTING.ASPP_ACT, cfg.SETTING.LEAD,
                                     cfg.PARAMETERS.P, cfg.SETTING.DILATIONS,
-                                    act_func=cfg.SETTING.ACT, f_act_func=cfg.SETTING.F_ACT)
+                                    act_func=cfg.SETTING.ACT, f_act_func=cfg.SETTING.F_ACT,
+                                    apply_residual=cfg.SETTING.RESIDUAL)
 
     print("The network {} has {} parameters in total".format(cfg.SETTING.NETWORK,
                                                              sum(x.numel() for x in net.parameters())))
@@ -227,7 +243,7 @@ def train(args):
         print("The saved model is loaded.")
     net = net.cuda()
 
-    criterion_cls_4 = loss_function(cfg.SETTING.LOSS, dataset=source, num_ew=cfg.PARAMETERS.N)
+    criterion_cls_4 = loss_function(cfg.SETTING.LOSS, dataset=source, num_ew=cfg.PARAMETERS.N, T=cfg.PARAMETERS.T)
     criterion_dist = build_distance(cfg.SETTING.DISTANCE)
 
     optimizer_pre = get_optimizer(optimizer_, net.parameters(), lr, w_l2)
@@ -245,6 +261,9 @@ def train(args):
                                                step_size=decay_step * 10,
                                                gamma=decay_rate)
     evaluator = Eval(num_class=4)
+    '''Initial and register the EMA'''
+    ema = EMA(model=net, decay=0.99)
+    ema.register()
 
     if check_epoch < pre_train_epochs - 1:
         print("Starting STAGE I: pre-training the model using source data")
@@ -267,6 +286,9 @@ def train(args):
                 loss.backward()
                 optimizer_pre.step()
                 scheduler_pre.step()
+                if args.use_ema:
+                    ema.update()
+                    ema.apply_shadow()
 
                 running_lr = optimizer_pre.state_dict()['param_groups'][0]['lr']
 
@@ -309,9 +331,11 @@ def train(args):
             for idb, data_batch in enumerate(dataloader):
                 net.train()
 
-                s_batch, sl_batch, _, _ = data_batch
+                s_batch, sl_batch, t_batch, tl_batch = data_batch
                 s_batch = s_batch.cuda()
                 sl_batch = sl_batch.cuda()
+                t_batch = t_batch.cuda()
+                tl_batch = tl_batch.cuda()
 
                 feat_s, preds_s = net(s_batch)
 
@@ -366,6 +390,9 @@ def train(args):
                 loss.backward(retain_graph=True)
                 optimizer_re.step()
                 scheduler_re.step()
+                if args.use_ema:
+                    ema.update()
+                    ema.apply_shadow()
 
                 for l in range(4):
                     centers_s[l] = centers_s[l].detach()
@@ -397,22 +424,22 @@ def train(args):
 
     centers_source_dir = osp.join(save_path, "centers_source.mat")
     centers_target_dir = osp.join(save_path, "centers_target.mat")
-    centers_dir = osp.join(save_path, "centers.mat")
-    flag_centers = osp.exists(centers_source_dir) and osp.exists(centers_target_dir) and osp.exists(centers_dir)
+    flag_centers = osp.exists(centers_source_dir) and osp.exists(centers_target_dir)
 
     center_source_dir = osp.join(save_path, "center_s.mat")
     center_target_dir = osp.join(save_path, "center_t.mat")
     flag_center = osp.exists(center_source_dir) and osp.exists(center_target_dir)
 
     if flag_centers:
-        centers_s = sio.loadmat(centers_source_dir)
-        centers_t = sio.loadmat(centers_target_dir)
-        centers = sio.loadmat(centers_dir)
+        centers_s_ = sio.loadmat(centers_source_dir)
+        centers_t_ = sio.loadmat(centers_target_dir)
+        centers_s = {}
+        centers_t = {}
         for l in range(4):
-            centers_s[l] = torch.from_numpy(centers_s['c{}'.format(l)].squeeze()).cuda()
-            centers_t[l] = torch.from_numpy(centers_t['c{}'.format(l)].squeeze()).cuda()
-            centers[l] = torch.from_numpy(centers['c{}'.format(l)].squeeze().astype(np.float32)).cuda()
-
+            if 'c{}'.format(l) in centers_s_.keys():
+                centers_s[l] = torch.from_numpy(centers_s_['c{}'.format(l)].squeeze()).cuda()
+            if 'c{}'.format(l) in centers_t_.keys():
+                centers_t[l] = torch.from_numpy(centers_t_['c{}'.format(l)].squeeze()).cuda()
     else:
         net.eval()
         centers_s, counter_s = init_source_centers(net, source, source_records, data_dict_source,
@@ -425,18 +452,13 @@ def train(args):
                                                    lead=cfg.SETTING.LEAD, thrs=thrs)
         centers_s_np = {}
         centers_t_np = {}
-        centers_np = {}
-        centers = {}
         for l in range(4):
-            centers_s_np['c{}'.format(l)] = centers_s[l].detach().cpu().numpy()
-            centers_t_np['c{}'.format(l)] = centers_t[l].detach().cpu().numpy()
-            centers_np['c{}'.format(l)] = ((centers_s_np['c{}'.format(l)] * counter_s[l] +
-                                            centers_t_np['c{}'.format(l)] * counter_t[l])
-                                           / (counter_s[l] + counter_t[l])).astype(np.float32)
-            centers[l] = torch.from_numpy(centers_np['c{}'.format(l)]).cuda()
+            if l in centers_s.keys():
+                centers_s_np['c{}'.format(l)] = centers_s[l].detach().cpu().numpy()
+            if l in centers_t.keys():
+                centers_t_np['c{}'.format(l)] = centers_t[l].detach().cpu().numpy()
         sio.savemat(centers_source_dir, centers_s_np)
         sio.savemat(centers_target_dir, centers_t_np)
-        sio.savemat(centers_dir, centers_np)
 
     if flag_center:
         center_s = torch.from_numpy(sio.loadmat(center_source_dir)['c'].squeeze()).cuda()
@@ -523,11 +545,14 @@ def train(args):
 
                         local_centers_tl = torch.mean(_feat_t, dim=0)
                         tmp_centers_t[l] = local_centers_tl
-                        delta_ct = centers_t[l] - local_centers_tl
-                        centers_t[l] = centers_t[l] - lr_ct * delta_ct
 
-                        loss_ct_l = criterion_dist(local_centers_tl, centers_t[l])
-                        loss_ct += loss_ct_l
+                        if l in centers_t.keys():
+                            delta_ct = centers_t[l] - local_centers_tl
+                            centers_t[l] = centers_t[l] - lr_ct * delta_ct
+                            loss_ct_l = criterion_dist(local_centers_tl, centers_t[l])
+                            loss_ct += loss_ct_l
+                        else:
+                            centers_t[l] = local_centers_tl
 
                         if flag_intra:
                             m_feat_t = centers_t[l].repeat((bs_, 1))
@@ -542,6 +567,7 @@ def train(args):
 
             tmp_centers_s = {}
             tmp_feats_s = {}
+
             for l in range(4):
                 _index = np.argwhere(sl_batch_np == l)
                 if len(_index):
@@ -567,7 +593,7 @@ def train(args):
             if cfg.SETTING.CLoss:
                 loss += loss_cs * w_cs
 
-            for l in range(4):
+            for l in centers_t.keys():
                 loss_cst_l = criterion_dist(centers_s[l], centers_t[l])
                 loss_cst += loss_cst_l
 
@@ -606,33 +632,19 @@ def train(args):
                         loss_coral += coral(tmp_feats_s[l], tmp_feats_t[l])
                 loss += loss_coral
 
-            loss_c = 0
-
-            for l in range(4):
-                if (l in tmp_centers_s.keys()) and (l in tmp_centers_t.keys()):
-                    tmp_centers_sl = tmp_centers_s[l]
-                    tmp_centers_tl = tmp_centers_t[l]
-                    m_centers_stl = (pesudo_label_nums[l] * tmp_centers_tl + true_label_nums[l] * tmp_centers_sl) \
-                                    / (pesudo_label_nums[l] + true_label_nums[l])
-                    delta_l = centers[l] - m_centers_stl
-                    centers[l] = centers[l] - lr_c * delta_l
-
-                    loss_cl = criterion_dist(m_centers_stl, centers[l])
-                    loss_c += loss_cl
-
-            if flag_c:
-                loss += loss_c * w_c
-
             optimizer_main.zero_grad()
             loss.backward(retain_graph=True)
             optimizer_main.step()
             scheduler_main.step()
+            if args.use_ema:
+                ema.update()
+                ema.apply_shadow()
 
             running_lr = optimizer_main.state_dict()['param_groups'][0]['lr']
             torch.cuda.empty_cache()
-            for l in range(4):
-                centers[l] = centers[l].detach()
+            for l in centers_s.keys():
                 centers_s[l] = centers_s[l].detach()
+            for l in centers_t.keys():
                 centers_t[l] = centers_t[l].detach()
             center_s = center_s.detach()
             center_t = center_t.detach()
@@ -640,10 +652,10 @@ def train(args):
             if idb % 10 == 9:
                 print("[{}, {}] cls loss: {:.4f}, cs loss: {:.4f}, "
                       "ct loss: {:.4f}, cst loss: {:.4f}, mmd loss: {:.4f}, "
-                      "inter loss: {:.4f}, intra loss: {:.4f}, c loss: {:.4f}, "
+                      "inter loss: {:.4f}, intra loss: {:.4f}, "
                       "CORAL: {:.4f}, "
                       "lr: {:.5f}".format(epoch, idb, loss_cls, loss_cs, loss_ct, loss_cst, loss_mmd,
-                                          loss_inter, loss_intra, loss_c, loss_coral, running_lr))
+                                          loss_inter, loss_intra, loss_coral, running_lr))
 
                 print("The number of pesudo labels and true labels:")
                 pprint.pprint(pesudo_label_nums)

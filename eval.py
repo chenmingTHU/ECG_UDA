@@ -21,6 +21,9 @@ from src.config import get_cfg_defaults
 import argparse
 import pprint
 
+import matplotlib.pyplot as plt
+plt.switch_backend('Agg')
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default=None, type=str,
@@ -53,6 +56,10 @@ def eval(args):
     exp_id = os.path.basename(cfg_dir).split('.')[0]
     save_path = os.path.join(cfg.SYSTEM.SAVE_PATH, exp_id)
 
+    img_path = os.path.join('./figures', exp_id)
+    if not os.path.exists(img_path):
+        os.makedirs(img_path)
+
     check_epoch = args.check_epoch
     check_point_dir = osp.join(save_path, '{}.pkl'.format(check_epoch))
 
@@ -66,7 +73,8 @@ def eval(args):
                             p=cfg.PARAMETERS.P,
                             dilations=cfg.SETTING.DILATIONS,
                             act_func=cfg.SETTING.ACT,
-                            f_act_func=cfg.SETTING.F_ACT)
+                            f_act_func=cfg.SETTING.F_ACT,
+                            apply_residual=cfg.SETTING.RESIDUAL)
     net.load_state_dict(torch.load(check_point_dir)['model_state_dict'])
     net = net.cuda()
     net.eval()
@@ -91,6 +99,8 @@ def eval(args):
 
     preds_entire = []
     labels_entire = []
+    probs_entire = []
+    samples = []
 
     with torch.no_grad():
         for idb, data_batch in enumerate(dataloader):
@@ -108,23 +118,35 @@ def eval(args):
 
             preds_entire.append(preds)
             labels_entire.append(l_batch)
+            probs_entire.append(preds_softmax_np)
+            samples.append(s_batch.detach().cpu().numpy())
 
             torch.cuda.empty_cache()
 
     preds_entire = np.concatenate(preds_entire, axis=0)
     labels_entire = np.concatenate(labels_entire, axis=0)
+    probs_entire = np.concatenate(probs_entire, axis=0)
+    samples = np.concatenate(samples, axis=0)
 
-    results = evaluator._metrics(predictions=preds_entire,
-                                 labels=labels_entire)
+    # '''Visualize incorrect samples'''
+    # indices_preds_2 = np.argwhere(preds_entire == 2).squeeze(axis=1)
+    # labels_ = labels_entire[indices_preds_2]
+    # indices_labels_0 = np.argwhere(labels_ == 0).squeeze(axis=1)
+    # samples_2_to_0 = samples[indices_preds_2[indices_labels_0]]
+    #
+    # for k in range(samples_2_to_0.shape[0]):
+    #     plt.figure(figsize=(20.5, 15.5))
+    #     plt.plot(samples_2_to_0[k, 0, 0])
+    #     plt.savefig(os.path.join(img_path, '2_to_0_{}.png'.format(k)), bbox_inches='tight')
+    #     plt.close()
 
     Pp, Se = evaluator._sklean_metrics(y_pred=preds_entire,
                                        y_label=labels_entire)
-
+    results = evaluator._metrics(predictions=preds_entire, labels=labels_entire)
     con_matrix = evaluator._confusion_matrix(y_pred=preds_entire,
                                              y_label=labels_entire)
 
-    pprint.pprint(results)
-
+    print('The overall accuracy is: {}'.format(results['Acc']))
     print("The confusion matrix is: ")
     print(con_matrix)
     print('The sklearn metrics are: ')
@@ -133,6 +155,23 @@ def eval(args):
     print('Se: ')
     pprint.pprint(Se)
     print('The F1 score is: {}'.format(evaluator._f1_score(y_pred=preds_entire, y_true=labels_entire)))
+
+    # for l in range(4):
+    #     indices_l = np.argwhere(labels_entire == l).squeeze(axis=1)
+    #     probs_l = probs_entire[indices_l]
+    #
+    #     plt.figure(figsize=(30, 20))
+    #     plt.subplot(411)
+    #     _, _, _ = plt.hist(probs_l[:, 0], bins=300)
+    #     plt.subplot(412)
+    #     _, _, _ = plt.hist(probs_l[:, 1], bins=300)
+    #     plt.subplot(413)
+    #     _, _, _ = plt.hist(probs_l[:, 2], bins=300)
+    #     plt.subplot(414)
+    #     _, _, _ = plt.hist(probs_l[:, 3], bins=300)
+    #     plt.xticks(np.arange(0, 0.05, 1))
+    #     plt.savefig(osp.join(img_path, '{}_hist_{}.png'.format(check_epoch, l)), bbox_inches='tight')
+    #     plt.close()
 
 
 if __name__ == '__main__':

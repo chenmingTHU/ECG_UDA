@@ -156,13 +156,14 @@ class DynamicLoss(nn.Module):
 
 class ExpWeightedLoss(nn.Module):
 
-    def __init__(self, n, v, s, f, beta=100):
+    def __init__(self, n, v, s, f, beta=100, T=1):
         super(ExpWeightedLoss, self).__init__()
 
         self.num_n = math.exp(-n / beta)
         self.num_v = math.exp(-v / beta)
         self.num_s = math.exp(-s / beta)
         self.num_f = math.exp(-f / beta)
+        self.T = T
 
         sum_ = self.num_n + self.num_v + self.num_s + self.num_f
         print("The Exponential weights are: {}, {}, {}, {}".format(self.num_n / sum_, self.num_v / sum_,
@@ -179,7 +180,7 @@ class ExpWeightedLoss(nn.Module):
 
         target = target.view(-1, 1)
 
-        logpt = F.log_softmax(x, dim=1)
+        logpt = F.log_softmax(x / self.T, dim=1)
         logpt = logpt.gather(1, index=target)
         logpt = logpt.view(-1)
 

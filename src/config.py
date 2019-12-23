@@ -30,6 +30,9 @@ _C.TRAIN.IMBALANCE_SAMPLE = True
 
 _C.SETTING = CN()
 
+# The random seed used in the experiment
+_C.SETTING.SEED = 0
+
 # The model/network name
 _C.SETTING.NETWORK = 'ACNN'
 # Training dataset
@@ -70,18 +73,17 @@ _C.SETTING.RE_TRAIN = False
 _C.SETTING.OPTIMIZER = 'Adam'
 # The setting of norm-alignment
 _C.SETTING.ALIGN_SET = 'soft'
-
 # The dilations of ASPP module in ACNN, default=(1, 6, 12, 18)
 _C.SETTING.DILATIONS = (1, 6, 12, 18)
 # The marker for applying incremental thresholds for obtaining pesudo labels
 _C.SETTING.INCRE_THRS = False
-
 # The activation function ASPP used
 _C.SETTING.ACT = 'tanh'
 _C.SETTING.F_ACT = 'tanh'
-
 # The marker of using CORAL for domain adaptation
 _C.SETTING.CORAL = False
+# The marker of applying residual transfer on classifier
+_C.SETTING.RESIDUAL = False
 
 
 _C.PARAMETERS = CN()
@@ -144,6 +146,9 @@ _C.PARAMETERS.P = 0.0
 
 # The paramter of EWLoss that controls the weights
 _C.PARAMETERS.N = 75000
+
+# The temperature of Cross-entropy loss
+_C.PARAMETERS.T = 1
 
 
 def get_cfg_defaults():
