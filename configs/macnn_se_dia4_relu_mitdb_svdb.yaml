@@ -2,15 +2,17 @@
 
 TRAIN:
   PRE_TRAIN_EPOCHS: 100
-  EPOCHS: 500
+  EPOCHS: 200
   LR: 0.001
-  DECAY_RATE: 0.95
+  DECAY_RATE: 0.99
   DECAY_STEP: 300
 
 SETTING:
   NETWORK: 'MACNN_SE'
   LOSS: 'EWLoss'
   DISTANCE: 'Cosine'
+  TRAIN_DATASET: 'mitdb'
+  TEST_DATASET: 'svdb'
   CENTER: False
   ASPP_BN: True
   ASPP_ACT: True
@@ -18,10 +20,12 @@ SETTING:
   NORM_ALIGN: False
   BEAT_NUM: 0
   FIXED_LEN: 128
+  UDA_NUM: 300
   INTER_LOSS: True
   INTRA_LOSS: True
   DILATIONS: (1, 6, 12, 18)
-  ACT: 'leaky_relu'
+  ACT: 'relu'
+  SEED: 6
 
 PARAMETERS:
   W_L2: 0.0

@@ -1,14 +1,13 @@
-# acnn/acnn_mitdb_mitdb_1_300_200_cb_cosine.yaml
 
 TRAIN:
   PRE_TRAIN_EPOCHS: 100
-  EPOCHS: 500
+  EPOCHS: 200
   LR: 0.001
   DECAY_RATE: 0.99
   DECAY_STEP: 300
 
 SETTING:
-  NETWORK: 'MACNN_SE'
+  NETWORK: 'MACNN_Context'
   LOSS: 'EWLoss'
   DISTANCE: 'Cosine'
   CENTER: False

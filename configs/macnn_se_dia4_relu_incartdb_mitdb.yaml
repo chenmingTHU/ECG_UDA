@@ -2,7 +2,7 @@
 
 TRAIN:
   PRE_TRAIN_EPOCHS: 100
-  EPOCHS: 500
+  EPOCHS: 200
   LR: 0.001
   DECAY_RATE: 0.99
   DECAY_STEP: 300
@@ -11,6 +11,8 @@ SETTING:
   NETWORK: 'MACNN_SE'
   LOSS: 'EWLoss'
   DISTANCE: 'Cosine'
+  TRAIN_DATASET: 'incartdb'
+  TEST_DATASET: 'mitdb'
   CENTER: False
   ASPP_BN: True
   ASPP_ACT: True

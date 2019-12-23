@@ -23,6 +23,7 @@ SETTING:
   INTRA_LOSS: True
   DILATIONS: (1, 6, 12, 18)
   ACT: 'relu'
+  INCRE_THRS: True
   SEED: 1
 
 PARAMETERS:
